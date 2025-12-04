@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Bell, AlertTriangle, Info, CheckCircle, X, Droplet } from 'lucide-react'
-import { getAlerts, markAlertAsRead, addAlert, getDrains } from '../../services/drainService'
+import { Bell, AlertTriangle, Info, CheckCircle, X, Droplet, Trash2, Loader } from 'lucide-react'
+import { getAlerts, markAlertAsRead, addAlert, getDrains, deleteAlert } from '../../services/drainService'
 import { subscribeToCollection } from '../../services/firestoreHelpers'
 import { format } from 'date-fns'
 import Card from '../../components/ui/Card'
@@ -17,6 +17,7 @@ const NotificationCenter = () => {
   const [loadingDrains, setLoadingDrains] = useState(true)
   const [filter, setFilter] = useState('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [deletingAlertId, setDeletingAlertId] = useState(null)
   const [newAlert, setNewAlert] = useState({
     title: '',
     message: '',
@@ -61,6 +62,23 @@ const NotificationCenter = () => {
       await markAlertAsRead(alertId)
     } catch (error) {
       console.error('Error marking alert as read:', error)
+      alert('Failed to mark alert as read')
+    }
+  }
+
+  const handleDeleteAlert = async (alertId) => {
+    if (!confirm('Are you sure you want to delete this notification? This action cannot be undone.')) {
+      return
+    }
+
+    setDeletingAlertId(alertId)
+    try {
+      await deleteAlert(alertId)
+    } catch (error) {
+      console.error('Error deleting alert:', error)
+      alert('Failed to delete notification')
+    } finally {
+      setDeletingAlertId(null)
     }
   }
 
@@ -200,17 +218,38 @@ const NotificationCenter = () => {
                     </div>
                   </div>
                 </div>
-                {!alert.read && (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {!alert.read && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleMarkAsRead(alert.id)}
+                      className="flex items-center gap-1"
+                    >
+                      <CheckCircle size={16} />
+                      Mark Read
+                    </Button>
+                  )}
                   <Button
-                    variant="secondary"
+                    variant="danger"
                     size="sm"
-                    onClick={() => handleMarkAsRead(alert.id)}
+                    onClick={() => handleDeleteAlert(alert.id)}
+                    disabled={deletingAlertId === alert.id}
                     className="flex items-center gap-1"
                   >
-                    <CheckCircle size={16} />
-                    Mark Read
+                    {deletingAlertId === alert.id ? (
+                      <>
+                        <Loader className="animate-spin" size={16} />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 size={16} />
+                        Delete
+                      </>
+                    )}
                   </Button>
-                )}
+                </div>
               </div>
             </Card>
           ))}

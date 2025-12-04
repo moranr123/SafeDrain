@@ -8,6 +8,7 @@ import { format } from 'date-fns'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
+import Select from '../../components/ui/Select'
 
 const ReportsList = () => {
   const { currentUser } = useAuth()
@@ -81,6 +82,8 @@ const ReportsList = () => {
         return 'bg-blue-100 text-blue-800 border-blue-200'
       case 'pending':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'rejected':
+        return 'bg-red-100 text-red-800 border-red-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
@@ -163,8 +166,22 @@ const ReportsList = () => {
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+      {/* Filters - Dropdown on mobile, buttons on larger screens */}
+      <div className="md:hidden">
+        <Select
+          label="Filter by Severity"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="w-full"
+        >
+          <option value="all">All Severity</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </Select>
+      </div>
+      <div className="hidden md:flex items-center gap-1.5 sm:gap-2 flex-wrap">
         <Filter size={16} className="text-text-secondary flex-shrink-0" />
         {['all', 'critical', 'high', 'medium', 'low'].map((filterType) => (
           <Button
@@ -272,6 +289,14 @@ const ReportsList = () => {
                 </span>
               )}
             </div>
+
+            {/* Rejection Reason - Show if report is rejected */}
+            {selectedReport.status === 'rejected' && selectedReport.rejectionReason && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                <h3 className="text-sm font-semibold text-red-800 mb-1">Rejection Reason</h3>
+                <p className="text-sm text-red-700">{selectedReport.rejectionReason}</p>
+              </div>
+            )}
 
             {/* Description */}
             <div>

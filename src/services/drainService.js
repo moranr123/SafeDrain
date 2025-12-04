@@ -187,3 +187,12 @@ export const markAlertAsRead = async (alertId) => {
   }
 }
 
+export const deleteAlert = async (alertId) => {
+  try {
+    await deleteDoc(doc(db, ALERTS_COLLECTION, alertId))
+  } catch (error) {
+    console.error('Error deleting alert:', error)
+    throw error
+  }
+}
+

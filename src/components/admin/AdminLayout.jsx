@@ -11,17 +11,22 @@ import {
   Menu,
   X,
   Droplet,
-  Home
+  Home,
+  Loader,
+  AlertCircle
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import Button from '../ui/Button'
 import Logo from '../Logo'
+import Modal from '../ui/Modal'
 
 const AdminLayout = ({ children }) => {
   const { currentUser, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   const navItems = [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -35,12 +40,19 @@ const AdminLayout = ({ children }) => {
   const isActive = (path) => location.pathname === path
 
   const handleLogout = async () => {
+    setLoggingOut(true)
     try {
       await logout()
       navigate('/login')
     } catch (error) {
       console.error('Logout error:', error)
+      alert('Failed to sign out. Please try again.')
+      setLoggingOut(false)
     }
+  }
+
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true)
   }
 
   useEffect(() => {
@@ -88,11 +100,21 @@ const AdminLayout = ({ children }) => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleLogout}
+              onClick={handleLogoutClick}
+              disabled={loggingOut}
               className="flex items-center gap-2"
             >
-              <LogOut size={16} />
-              <span className="hidden sm:inline">Logout</span>
+              {loggingOut ? (
+                <>
+                  <Loader className="animate-spin" size={16} />
+                  <span className="hidden sm:inline">Signing Out...</span>
+                </>
+              ) : (
+                <>
+                  <LogOut size={16} />
+                  <span className="hidden sm:inline">Logout</span>
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -157,6 +179,49 @@ const AdminLayout = ({ children }) => {
           </div>
         </main>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <Modal
+        isOpen={showLogoutConfirm}
+        onClose={() => !loggingOut && setShowLogoutConfirm(false)}
+        title="Confirm Sign Out"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <p className="text-text mb-2">Are you sure you want to sign out?</p>
+              <p className="text-sm text-text-secondary">
+                You will need to sign in again to access the admin dashboard.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="flex-1 flex items-center justify-center gap-2"
+            >
+              {loggingOut ? (
+                <>
+                  <Loader className="animate-spin" size={16} />
+                  Signing Out...
+                </>
+              ) : (
+                'Sign Out'
+              )}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowLogoutConfirm(false)}
+              disabled={loggingOut}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

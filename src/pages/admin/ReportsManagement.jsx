@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Filter, Download, Eye, Edit, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { Filter, Download, Eye, Edit, CheckCircle, XCircle, Clock, X } from 'lucide-react'
 import { getReports, updateReport } from '../../services/reportService'
-import { subscribeToCollection } from '../../services/firestoreHelpers'
+import { subscribeToCollection, addDocument } from '../../services/firestoreHelpers'
 import { exportReportsToCSV, exportReportsToPDF } from '../../services/exportService'
+import { showNotification } from '../../services/fcmHelpers'
+import { Timestamp } from 'firebase/firestore'
 import { format } from 'date-fns'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import Textarea from '../../components/ui/Textarea'
 
 const ReportsManagement = () => {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -19,6 +22,7 @@ const ReportsManagement = () => {
   const [selectedReport, setSelectedReport] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState('')
 
   // Update URL when filter changes (separate effect to avoid recreating listener)
   useEffect(() => {
@@ -63,12 +67,58 @@ const ReportsManagement = () => {
     }
   }, []) // Empty dependency array - only set up once
 
+  const sendRejectionNotification = async (report, reason = '') => {
+    try {
+      const alertData = {
+        title: 'Report Rejected',
+        message: reason 
+          ? `Your report "${report.title}" has been rejected. Reason: ${reason}`
+          : `Your report "${report.title}" has been rejected.`,
+        severity: 'warning',
+        reportId: report.id,
+        reportTitle: report.title,
+        userId: report.userId,
+        read: false,
+        createdAt: Timestamp.now(),
+        type: 'report-rejected'
+      }
+      
+      await addDocument('alerts', alertData)
+      
+      // Try to show browser notification
+      try {
+        const notificationTitle = 'Report Rejected'
+        const notificationBody = reason 
+          ? `Your report "${report.title}" was rejected. Reason: ${reason}`
+          : `Your report "${report.title}" was rejected.`
+        showNotification(notificationTitle, notificationBody)
+      } catch (notifError) {
+        console.warn('Could not show browser notification:', notifError)
+      }
+    } catch (error) {
+      console.error('Error sending rejection notification:', error)
+      // Don't throw - notification failure shouldn't prevent rejection
+    }
+  }
+
   const handleStatusChange = async (reportId, newStatus) => {
     setUpdating(true)
     try {
-      await updateReport(reportId, { status: newStatus })
+      const report = reports.find(r => r.id === reportId)
+      
+      await updateReport(reportId, { 
+        status: newStatus,
+        ...(newStatus === 'rejected' && rejectionReason && { rejectionReason })
+      })
+      
+      // Send notification if report is rejected
+      if (newStatus === 'rejected' && report) {
+        await sendRejectionNotification(report, rejectionReason)
+      }
+      
       setShowModal(false)
       setSelectedReport(null)
+      setRejectionReason('')
     } catch (error) {
       console.error('Error updating report:', error)
       alert('Failed to update report status')
@@ -121,6 +171,8 @@ const ReportsManagement = () => {
         return 'bg-blue-100 text-blue-800 border-blue-200'
       case 'pending':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'rejected':
+        return 'bg-red-100 text-red-800 border-red-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
@@ -170,6 +222,7 @@ const ReportsManagement = () => {
               <option value="pending">Pending</option>
               <option value="in-progress">In Progress</option>
               <option value="resolved">Resolved</option>
+              <option value="rejected">Rejected</option>
             </Select>
           </div>
           <div className="flex items-center gap-2">
@@ -250,6 +303,7 @@ const ReportsManagement = () => {
                     size="sm"
                     onClick={() => {
                       setSelectedReport(report)
+                      setRejectionReason(report.rejectionReason || '')
                       setShowModal(true)
                     }}
                     className="flex items-center gap-1"
@@ -268,8 +322,11 @@ const ReportsManagement = () => {
       <Modal
         isOpen={showModal}
         onClose={() => {
-          setShowModal(false)
-          setSelectedReport(null)
+          if (!updating) {
+            setShowModal(false)
+            setSelectedReport(null)
+            setRejectionReason('')
+          }
         }}
         title="Update Report Status"
       >
@@ -287,13 +344,37 @@ const ReportsManagement = () => {
                 value={selectedReport.status || 'pending'}
                 onChange={(e) => {
                   setSelectedReport({ ...selectedReport, status: e.target.value })
+                  if (e.target.value !== 'rejected') {
+                    setRejectionReason('')
+                  }
                 }}
               >
                 <option value="pending">Pending</option>
                 <option value="in-progress">In Progress</option>
                 <option value="resolved">Resolved</option>
+                <option value="rejected">Rejected</option>
               </Select>
             </div>
+            
+            {/* Rejection Reason Field - Only show when status is rejected */}
+            {selectedReport.status === 'rejected' && (
+              <div>
+                <label className="block text-sm font-medium text-text mb-2">
+                  Rejection Reason <span className="text-text-muted">(Optional)</span>
+                </label>
+                <Textarea
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Provide a reason for rejecting this report..."
+                  rows={3}
+                  className="w-full"
+                />
+                <p className="text-xs text-text-secondary mt-1">
+                  This reason will be included in the notification sent to the user.
+                </p>
+              </div>
+            )}
+            
             <div className="flex gap-3">
               <Button
                 onClick={() => handleStatusChange(selectedReport.id, selectedReport.status || 'pending')}
@@ -305,9 +386,13 @@ const ReportsManagement = () => {
               <Button
                 variant="secondary"
                 onClick={() => {
-                  setShowModal(false)
-                  setSelectedReport(null)
+                  if (!updating) {
+                    setShowModal(false)
+                    setSelectedReport(null)
+                    setRejectionReason('')
+                  }
                 }}
+                disabled={updating}
               >
                 Cancel
               </Button>

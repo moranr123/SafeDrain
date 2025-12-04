@@ -7,10 +7,11 @@ import { getSyncStatus, syncPendingOperations } from '../../services/offlineServ
 import { syncPendingReports } from '../../services/reportService'
 import { testNotification, checkNotificationStatus } from '../../utils/testNotifications'
 import { format } from 'date-fns'
-import { User, Calendar, Wifi, WifiOff, RefreshCw, LogIn, Loader, Bell } from 'lucide-react'
+import { User, Calendar, Wifi, WifiOff, RefreshCw, LogIn, Loader, Bell, AlertCircle } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import Modal from '../../components/ui/Modal'
 
 const UserProfile = () => {
   const { currentUser, updateUserProfile, logout } = useAuth()
@@ -24,6 +25,8 @@ const UserProfile = () => {
   const [userStats, setUserStats] = useState({ totalReports: 0 })
   const [testingNotification, setTestingNotification] = useState(false)
   const [notificationStatus, setNotificationStatus] = useState(null)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   useEffect(() => {
     if (currentUser) {
@@ -90,12 +93,19 @@ const UserProfile = () => {
   }
 
   const handleLogout = async () => {
+    setLoggingOut(true)
     try {
       await logout()
       navigate('/login')
     } catch (error) {
       console.error('Logout error:', error)
+      alert('Failed to sign out. Please try again.')
+      setLoggingOut(false)
     }
+  }
+
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true)
   }
 
   // Show loading or redirect if not authenticated
@@ -347,11 +357,21 @@ const UserProfile = () => {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={handleLogout}
+                onClick={handleLogoutClick}
+                disabled={loggingOut}
                 className="w-full"
               >
-                <LogIn size={16} className="mr-2" />
-                Sign Out
+                {loggingOut ? (
+                  <>
+                    <Loader className="animate-spin mr-2" size={16} />
+                    Signing Out...
+                  </>
+                ) : (
+                  <>
+                    <LogIn size={16} className="mr-2" />
+                    Sign Out
+                  </>
+                )}
               </Button>
             </div>
           </Card>
@@ -368,6 +388,49 @@ const UserProfile = () => {
           </Card>
         </div>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <Modal
+        isOpen={showLogoutConfirm}
+        onClose={() => !loggingOut && setShowLogoutConfirm(false)}
+        title="Confirm Sign Out"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <p className="text-text mb-2">Are you sure you want to sign out?</p>
+              <p className="text-sm text-text-secondary">
+                You will need to sign in again to access your account.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="flex-1 flex items-center justify-center gap-2"
+            >
+              {loggingOut ? (
+                <>
+                  <Loader className="animate-spin" size={16} />
+                  Signing Out...
+                </>
+              ) : (
+                'Sign Out'
+              )}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowLogoutConfirm(false)}
+              disabled={loggingOut}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
