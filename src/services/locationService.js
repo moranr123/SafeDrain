@@ -122,3 +122,32 @@ export const checkLocationPermission = async () => {
   }
 }
 
+// Reverse geocode: Convert coordinates to address using Google Maps Geocoding API
+export const geocodeLatLng = async (latitude, longitude) => {
+  return new Promise((resolve, reject) => {
+    if (!window.google || !window.google.maps) {
+      reject(new Error('Google Maps API not loaded'))
+      return
+    }
+
+    const geocoder = new window.google.maps.Geocoder()
+    const latlng = {
+      lat: latitude,
+      lng: longitude
+    }
+
+    geocoder.geocode({ location: latlng }, (results, status) => {
+      if (status === 'OK') {
+        if (results[0]) {
+          resolve(results[0].formatted_address)
+        } else {
+          resolve(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`)
+        }
+      } else {
+        // If geocoding fails, return coordinates as fallback
+        resolve(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`)
+      }
+    })
+  })
+}
+

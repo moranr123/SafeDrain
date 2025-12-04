@@ -1,6 +1,11 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
+/**
+ * Protected Route Component
+ * Use RoleBasedRoute for role-based access control
+ * This component is kept for backward compatibility
+ */
 const ProtectedRoute = ({ children, requireAuth = true }) => {
   const { currentUser, loading } = useAuth()
 
@@ -13,7 +18,7 @@ const ProtectedRoute = ({ children, requireAuth = true }) => {
   }
 
   if (requireAuth && !currentUser) {
-    return <Navigate to="/admin/login" replace />
+    return <Navigate to="/login" replace />
   }
 
   return children

@@ -31,6 +31,7 @@ const SubmitReport = () => {
   const [photos, setPhotos] = useState([])
   const [uploadProgress, setUploadProgress] = useState({})
   const [showMap, setShowMap] = useState(false)
+  const [userLocation, setUserLocation] = useState(null)
   const [mapCenter, setMapCenter] = useState({ lat: 14.5995, lng: 120.9842 })
   const mapRef = useRef(null)
 
@@ -39,9 +40,30 @@ const SubmitReport = () => {
     libraries
   })
 
-  // Get location on mount
+  // Get user's current location on mount for map centering
   useEffect(() => {
-    handleGetLocation()
+    const fetchUserLocation = async () => {
+      try {
+        const loc = await getCurrentLocation()
+        setUserLocation({
+          lat: loc.latitude,
+          lng: loc.longitude
+        })
+        setMapCenter({
+          lat: loc.latitude,
+          lng: loc.longitude
+        })
+        // Also set location for the form if not already set
+        if (!location) {
+          setLocation(loc)
+        }
+      } catch (error) {
+        console.error('Error getting user location for map:', error)
+        // Keep default center if location fails
+      }
+    }
+
+    fetchUserLocation()
   }, [])
 
   // Update map center when location changes
@@ -197,13 +219,13 @@ const SubmitReport = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-8">
+    <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6 pb-8">
       <div>
-        <h1 className="text-3xl font-bold text-text mb-2">Submit Report</h1>
-        <p className="text-text-secondary">Report a drain issue or concern</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-text mb-1 sm:mb-2">Submit Report</h1>
+        <p className="text-sm sm:text-base text-text-secondary">Report a drain issue or concern</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {/* Title */}
         <Input
           label="Title"
@@ -238,36 +260,136 @@ const SubmitReport = () => {
 
         {/* Location */}
         <Card padding="sm">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-3">
             <label className="text-sm font-medium text-text flex items-center gap-2">
               <MapPin size={16} />
               Location
             </label>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                handleGetLocation()
-              }}
-              disabled={gettingLocation}
-              className="flex items-center gap-2"
-            >
-              {gettingLocation ? (
-                <>
-                  <Loader className="animate-spin" size={16} />
-                  Getting...
-                </>
-              ) : (
-                <>
-                  <MapPin size={16} />
-                  {location ? 'Update' : 'Get'} Location
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleShowMap()
+                }}
+                className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-initial text-xs sm:text-sm"
+              >
+                <MapPin size={14} />
+                <span className="hidden xs:inline">{showMap ? 'Hide' : 'Show'} Map</span>
+                <span className="xs:hidden">Map</span>
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleGetLocation()
+                }}
+                disabled={gettingLocation}
+                className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-initial text-xs sm:text-sm"
+              >
+                {gettingLocation ? (
+                  <>
+                    <Loader className="animate-spin" size={14} />
+                    <span className="hidden xs:inline">Getting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Navigation size={14} />
+                    <span className="hidden xs:inline">Use GPS</span>
+                    <span className="xs:hidden">GPS</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
+
+          {/* Map */}
+          {showMap && (
+            <div className="mb-3">
+              {!isLoaded ? (
+                <div className="h-64 rounded-xl border border-border flex items-center justify-center bg-gray-50">
+                  <div className="text-center">
+                    <Loader className="animate-spin mx-auto mb-2 text-primary" size={24} />
+                    <p className="text-sm text-text-secondary">Loading map...</p>
+                  </div>
+                </div>
+              ) : loadError ? (
+                <div className="h-64 rounded-xl border border-border flex items-center justify-center bg-red-50">
+                  <div className="text-center">
+                    <p className="text-sm text-red-600">Error loading map</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-48 sm:h-64 rounded-xl overflow-hidden border border-border relative">
+                  <GoogleMap
+                    mapContainerStyle={{ width: '100%', height: '100%' }}
+                    center={mapCenter}
+                    zoom={15}
+                    onClick={onMapClick}
+                    onLoad={onMapLoad}
+                    options={{
+                      disableDefaultUI: false,
+                      zoomControl: true,
+                      streetViewControl: false,
+                      mapTypeControl: false,
+                      fullscreenControl: false,
+                    }}
+                  >
+                    {/* User's Current Location Marker */}
+                    {userLocation && (
+                      <Marker
+                        position={userLocation}
+                        icon={{
+                          path: google.maps.SymbolPath.CIRCLE,
+                          fillColor: '#4285F4',
+                          fillOpacity: 1,
+                          strokeWeight: 3,
+                          strokeColor: '#ffffff',
+                          scale: 10,
+                        }}
+                        title="Your Current Location"
+                      />
+                    )}
+                    
+                    {/* Selected/Pinned Location Marker */}
+                    {location && (
+                      <Marker
+                        position={{
+                          lat: location.latitude,
+                          lng: location.longitude
+                        }}
+                        icon={{
+                          path: google.maps.SymbolPath.CIRCLE,
+                          fillColor: '#10a37f',
+                          fillOpacity: 1,
+                          strokeWeight: 2,
+                          strokeColor: '#ffffff',
+                          scale: 8,
+                        }}
+                        title="Selected Location"
+                      />
+                    )}
+                  </GoogleMap>
+                  <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs text-text shadow-sm">
+                    <span className="hidden sm:inline">Click on the map to pin location</span>
+                    <span className="sm:hidden">Tap to pin</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {loadError && (
+            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-xs text-red-600">Error loading map. Please try again.</p>
+            </div>
+          )}
           
           {location ? (
             <div className="space-y-2 p-3 bg-green-50 border border-green-200 rounded-xl">
@@ -293,7 +415,7 @@ const SubmitReport = () => {
           ) : (
             <div className="space-y-2 p-3 bg-yellow-50 border border-yellow-200 rounded-xl">
               <p className="text-sm text-text-muted">
-                {gettingLocation ? 'Getting your location...' : 'No location set. Click "Get Location" to enable GPS.'}
+                {gettingLocation ? 'Getting your location...' : 'No location set. Click "Show Map" to pin a location or "Use GPS" to get your current location.'}
               </p>
               {locationError && (
                 <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
@@ -325,26 +447,26 @@ const SubmitReport = () => {
                 file:cursor-pointer"
             />
             
-            {photos.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {photos.map((photo, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={URL.createObjectURL(photo)}
-                      alt={`Preview ${index + 1}`}
-                      className="w-full h-32 object-cover rounded-xl border border-border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(index)}
-                      className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+                    {photos.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                        {photos.map((photo, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={URL.createObjectURL(photo)}
+                              alt={`Preview ${index + 1}`}
+                              className="w-full h-24 sm:h-32 object-cover rounded-xl border border-border"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removePhoto(index)}
+                              className="absolute top-1 right-1 sm:top-2 sm:right-2 p-1 sm:p-1.5 bg-red-600 text-white rounded-full opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity touch-manipulation"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
           </div>
         </div>
 
@@ -362,20 +484,20 @@ const SubmitReport = () => {
         )}
 
         {/* Submit Button */}
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <Button
             type="submit"
             disabled={loading || !location}
-            className="flex-1"
+            className="flex-1 w-full sm:w-auto"
           >
             {loading ? (
               <>
-                <Loader className="animate-spin mr-2" size={18} />
+                <Loader className="animate-spin mr-2" size={16} />
                 Submitting...
               </>
             ) : (
               <>
-                <Upload size={18} className="mr-2" />
+                <Upload size={16} className="mr-2" />
                 Submit Report
               </>
             )}
@@ -384,6 +506,7 @@ const SubmitReport = () => {
             type="button"
             variant="secondary"
             onClick={() => navigate('/reports')}
+            className="w-full sm:w-auto"
           >
             Cancel
           </Button>

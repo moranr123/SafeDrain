@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Loader, Filter } from 'lucide-react'
+import { Loader, Filter, Navigation } from 'lucide-react'
 import { GoogleMap, Marker, InfoWindow, useLoadScript } from '@react-google-maps/api'
 import { getReports } from '../../services/reportService'
 import { getDrains } from '../../services/drainService'
+import { getCurrentLocation } from '../../services/locationService'
 import { subscribeToCollection } from '../../services/firestoreHelpers'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -18,10 +19,21 @@ const AdminMapView = () => {
   const [showDrains, setShowDrains] = useState(true)
   const [filterSeverity, setFilterSeverity] = useState('all')
   const [selectedMarker, setSelectedMarker] = useState(null)
+  const [userLocation, setUserLocation] = useState(null)
+  const [gettingLocation, setGettingLocation] = useState(true)
   const mapRef = useRef(null)
 
-  const initialLat = parseFloat(searchParams.get('lat')) || 14.5995
-  const initialLng = parseFloat(searchParams.get('lng')) || 120.9842
+  // Get user location from URL params or default
+  const urlLat = parseFloat(searchParams.get('lat'))
+  const urlLng = parseFloat(searchParams.get('lng'))
+  
+  // Default center (Manila)
+  const defaultCenter = { lat: 14.5995, lng: 120.9842 }
+  
+  // Determine initial center
+  const [center, setCenter] = useState(
+    urlLat && urlLng ? { lat: urlLat, lng: urlLng } : defaultCenter
+  )
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: 'AIzaSyByXb-FgYHiNhVIsK00kM1jdXYr_OerV7Q',
@@ -31,11 +43,6 @@ const AdminMapView = () => {
   const mapContainerStyle = {
     width: '100%',
     height: '100%'
-  }
-
-  const center = {
-    lat: initialLat,
-    lng: initialLng
   }
 
   const mapOptions = {
@@ -52,6 +59,33 @@ const AdminMapView = () => {
       }
     ]
   }
+
+  // Get user's current location
+  useEffect(() => {
+    const fetchUserLocation = async () => {
+      try {
+        const location = await getCurrentLocation()
+        setUserLocation({
+          lat: location.latitude,
+          lng: location.longitude
+        })
+        // Only set center to user location if no URL params
+        if (!urlLat || !urlLng) {
+          setCenter({
+            lat: location.latitude,
+            lng: location.longitude
+          })
+        }
+      } catch (error) {
+        console.error('Error getting user location:', error)
+        // Keep default center if location fails
+      } finally {
+        setGettingLocation(false)
+      }
+    }
+
+    fetchUserLocation()
+  }, [urlLat, urlLng])
 
   useEffect(() => {
     // Real-time listeners
@@ -128,6 +162,20 @@ const AdminMapView = () => {
     }
   }
 
+  const createUserLocationIcon = () => {
+    if (!window.google?.maps) return null
+    
+    return {
+      path: window.google.maps.SymbolPath.CIRCLE,
+      fillColor: '#4285F4', // Google Blue
+      fillOpacity: 1,
+      strokeColor: '#ffffff',
+      strokeWeight: 3,
+      scale: 12,
+      anchor: new window.google.maps.Point(0, 0)
+    }
+  }
+
   const filteredReports = reports.filter(report => {
     if (!showReports) return false
     if (filterSeverity === 'all') return true
@@ -144,7 +192,7 @@ const AdminMapView = () => {
     )
   }
 
-  if (!isLoaded) {
+  if (!isLoaded || gettingLocation) {
     return (
       <div className="flex items-center justify-center h-[600px]">
         <div className="text-center">
@@ -206,28 +254,53 @@ const AdminMapView = () => {
           options={mapOptions}
           onLoad={onMapLoad}
         >
-          {/* Report Markers */}
-          {filteredReports
-            .filter(report => report.location)
-            .map((report) => (
-              <Marker
-                key={`report-${report.id}`}
-                position={{
-                  lat: report.location.latitude,
-                  lng: report.location.longitude
-                }}
-                icon={createMarkerIcon(getSeverityColor(report.severity))}
-                onClick={() => setSelectedMarker({ type: 'report', data: report })}
-              />
-            ))}
+          {/* User Location Marker */}
+          {userLocation && (
+            <Marker
+              position={userLocation}
+              icon={createUserLocationIcon()}
+              title="Your Location"
+              onClick={() => setSelectedMarker({ type: 'user', data: { position: userLocation } })}
+            />
+          )}
 
-          {/* Drain/Sensor Markers */}
+          {/* Report Markers - Show all reports (filtered by severity if needed) */}
+          {filteredReports
+            .filter(report => {
+              // Filter out reports without location
+              if (!report.location) return false
+              // Check if location has valid coordinates
+              const lat = report.location.latitude || report.location.lat
+              const lng = report.location.longitude || report.location.lng
+              return lat && lng && !isNaN(lat) && !isNaN(lng)
+            })
+            .map((report) => {
+              const lat = report.location.latitude || report.location.lat
+              const lng = report.location.longitude || report.location.lng
+              return (
+                <Marker
+                  key={`report-${report.id}`}
+                  position={{
+                    lat: lat,
+                    lng: lng
+                  }}
+                  icon={createMarkerIcon(getSeverityColor(report.severity))}
+                  onClick={() => setSelectedMarker({ type: 'report', data: report })}
+                />
+              )
+            })}
+
+          {/* Drain/Sensor Markers - Show all drains */}
           {showDrains && drains
-            .filter(drain => drain.location || (drain.latitude && drain.longitude))
+            .filter(drain => {
+              // Check multiple possible location formats
+              const lat = drain.location?.latitude || drain.location?.lat || drain.latitude
+              const lng = drain.location?.longitude || drain.location?.lng || drain.longitude
+              return lat && lng && !isNaN(lat) && !isNaN(lng)
+            })
             .map((drain) => {
-              const lat = drain.location?.latitude || drain.latitude
-              const lng = drain.location?.longitude || drain.longitude
-              if (!lat || !lng) return null
+              const lat = drain.location?.latitude || drain.location?.lat || drain.latitude
+              const lng = drain.location?.longitude || drain.location?.lng || drain.longitude
 
               return (
                 <Marker
@@ -243,17 +316,31 @@ const AdminMapView = () => {
           {selectedMarker && (
             <InfoWindow
               position={{
-                lat: selectedMarker.type === 'report'
-                  ? selectedMarker.data.location.latitude
-                  : selectedMarker.data.location?.latitude || selectedMarker.data.latitude,
-                lng: selectedMarker.type === 'report'
-                  ? selectedMarker.data.location.longitude
-                  : selectedMarker.data.location?.longitude || selectedMarker.data.longitude
+                lat: selectedMarker.type === 'user'
+                  ? selectedMarker.data.position.lat
+                  : selectedMarker.type === 'report'
+                  ? (selectedMarker.data.location?.latitude || selectedMarker.data.location?.lat)
+                  : (selectedMarker.data.location?.latitude || selectedMarker.data.location?.lat || selectedMarker.data.latitude),
+                lng: selectedMarker.type === 'user'
+                  ? selectedMarker.data.position.lng
+                  : selectedMarker.type === 'report'
+                  ? (selectedMarker.data.location?.longitude || selectedMarker.data.location?.lng)
+                  : (selectedMarker.data.location?.longitude || selectedMarker.data.location?.lng || selectedMarker.data.longitude)
               }}
               onCloseClick={() => setSelectedMarker(null)}
             >
               <div className="p-2 min-w-[200px]">
-                {selectedMarker.type === 'report' ? (
+                {selectedMarker.type === 'user' ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Navigation size={16} className="text-blue-600" />
+                      <h3 className="font-semibold text-sm">Your Location</h3>
+                    </div>
+                    <p className="text-xs text-gray-600">
+                      {selectedMarker.data.position.lat.toFixed(6)}, {selectedMarker.data.position.lng.toFixed(6)}
+                    </p>
+                  </>
+                ) : selectedMarker.type === 'report' ? (
                   <>
                     <h3 className="font-semibold text-sm mb-1">{selectedMarker.data.title}</h3>
                     <p className="text-xs text-gray-600 mb-2">
@@ -287,7 +374,11 @@ const AdminMapView = () => {
 
       {/* Legend */}
       <Card padding="sm">
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow"></div>
+            <span className="text-text-secondary">Your Location</span>
+          </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded-full bg-primary border-2 border-white shadow"></div>
             <span className="text-text-secondary">Active Sensors</span>

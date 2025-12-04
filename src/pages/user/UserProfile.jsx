@@ -1,43 +1,44 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { useNotifications } from '../../contexts/NotificationContext'
 import { getUserReports } from '../../services/reportService'
 import { getSyncStatus, syncPendingOperations } from '../../services/offlineService'
 import { syncPendingReports } from '../../services/reportService'
+import { testNotification, checkNotificationStatus } from '../../utils/testNotifications'
 import { format } from 'date-fns'
-import { User, Mail, Calendar, Wifi, WifiOff, RefreshCw, LogIn, UserPlus, AlertCircle, Loader } from 'lucide-react'
+import { User, Calendar, Wifi, WifiOff, RefreshCw, LogIn, Loader, Bell } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import Logo from '../../components/Logo'
 
 const UserProfile = () => {
-  const { currentUser, updateUserProfile, signup, login, logout } = useAuth()
+  const { currentUser, updateUserProfile, logout } = useAuth()
+  const { permission, isMonitoring, requestPermission, startMonitoring, stopMonitoring } = useNotifications()
+  const navigate = useNavigate()
   const [displayName, setDisplayName] = useState('')
   const [loading, setLoading] = useState(false)
   const [syncStatus, setSyncStatus] = useState({ isOnline: true, pendingCount: 0 })
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
   const [userStats, setUserStats] = useState({ totalReports: 0 })
-  
-  // Authentication states
-  const [authMode, setAuthMode] = useState('login') // 'login' or 'signup'
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [signupDisplayName, setSignupDisplayName] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
-  const [authError, setAuthError] = useState('')
+  const [testingNotification, setTestingNotification] = useState(false)
+  const [notificationStatus, setNotificationStatus] = useState(null)
 
   useEffect(() => {
     if (currentUser) {
       setDisplayName(currentUser.displayName || '')
       fetchUserStats()
       updateSyncStatus()
+    } else {
+      // Redirect to login if not authenticated
+      navigate('/login', { replace: true })
     }
 
     // Update sync status periodically
     const interval = setInterval(updateSyncStatus, 5000)
     return () => clearInterval(interval)
-  }, [currentUser])
+  }, [currentUser, navigate])
 
   const fetchUserStats = async () => {
     try {
@@ -88,207 +89,32 @@ const UserProfile = () => {
     }
   }
 
-  const handleLogin = async (e) => {
-    e.preventDefault()
-    setAuthLoading(true)
-    setAuthError('')
-
-    try {
-      await login(email, password)
-      setEmail('')
-      setPassword('')
-    } catch (error) {
-      setAuthError(error.message || 'Failed to login. Please check your credentials.')
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
-  const handleSignup = async (e) => {
-    e.preventDefault()
-    setAuthLoading(true)
-    setAuthError('')
-
-    if (password.length < 6) {
-      setAuthError('Password must be at least 6 characters')
-      setAuthLoading(false)
-      return
-    }
-
-    try {
-      await signup(email, password, signupDisplayName || null)
-      setEmail('')
-      setPassword('')
-      setSignupDisplayName('')
-      setAuthMode('login')
-    } catch (error) {
-      setAuthError(error.message || 'Failed to create account. Please try again.')
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
   const handleLogout = async () => {
     try {
       await logout()
+      navigate('/login')
     } catch (error) {
       console.error('Logout error:', error)
     }
   }
 
-  // Show login/signup form if not authenticated
+  // Show loading or redirect if not authenticated
   if (!currentUser) {
     return (
-      <div className="max-w-md mx-auto space-y-6 pb-8">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <Logo size="xl" />
-          </div>
-          <h1 className="text-3xl font-bold text-text mb-2">Safe Drain</h1>
-          <p className="text-text-secondary">
-            {authMode === 'login' ? 'Sign in to your account' : 'Create a new account'}
-          </p>
-        </div>
-
-        <Card>
-          {/* Toggle between login and signup */}
-          <div className="flex gap-2 mb-6 p-1 bg-bg rounded-xl">
-            <button
-              onClick={() => {
-                setAuthMode('login')
-                setAuthError('')
-                setEmail('')
-                setPassword('')
-                setSignupDisplayName('')
-              }}
-              className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                authMode === 'login'
-                  ? 'bg-primary text-white'
-                  : 'text-text-secondary hover:text-text'
-              }`}
-            >
-              <LogIn size={18} className="inline mr-2" />
-              Sign In
-            </button>
-            <button
-              onClick={() => {
-                setAuthMode('signup')
-                setAuthError('')
-                setEmail('')
-                setPassword('')
-                setSignupDisplayName('')
-              }}
-              className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                authMode === 'signup'
-                  ? 'bg-primary text-white'
-                  : 'text-text-secondary hover:text-text'
-              }`}
-            >
-              <UserPlus size={18} className="inline mr-2" />
-              Sign Up
-            </button>
-          </div>
-
-          <form onSubmit={authMode === 'login' ? handleLogin : handleSignup} className="space-y-4">
-            {authMode === 'signup' && (
-              <Input
-                label="Display Name (optional)"
-                type="text"
-                value={signupDisplayName}
-                onChange={(e) => setSignupDisplayName(e.target.value)}
-                placeholder="Your name"
-              />
-            )}
-
-            <Input
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              required
-              autoComplete="email"
-            />
-
-            <Input
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={authMode === 'signup' ? 'At least 6 characters' : 'Enter your password'}
-              required
-              autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
-            />
-
-            {authError && (
-              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-                <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                <span>{authError}</span>
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              disabled={authLoading}
-              className="w-full"
-            >
-              {authLoading ? (
-                <>
-                  <Loader className="animate-spin mr-2" size={18} />
-                  {authMode === 'login' ? 'Signing in...' : 'Creating account...'}
-                </>
-              ) : (
-                authMode === 'login' ? 'Sign In' : 'Create Account'
-              )}
-            </Button>
-          </form>
-
-          {authMode === 'login' && (
-            <div className="mt-4 text-center">
-              <p className="text-sm text-text-secondary">
-                Don't have an account?{' '}
-                <button
-                  onClick={() => {
-                    setAuthMode('signup')
-                    setAuthError('')
-                  }}
-                  className="text-primary hover:text-primary-dark font-medium"
-                >
-                  Sign up
-                </button>
-              </p>
-            </div>
-          )}
-
-          {authMode === 'signup' && (
-            <div className="mt-4 text-center">
-              <p className="text-sm text-text-secondary">
-                Already have an account?{' '}
-                <button
-                  onClick={() => {
-                    setAuthMode('login')
-                    setAuthError('')
-                  }}
-                  className="text-primary hover:text-primary-dark font-medium"
-                >
-                  Sign in
-                </button>
-              </p>
-            </div>
-          )}
-        </Card>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-text-secondary">Redirecting to login...</div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-8">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 pb-8">
       <div>
-        <h1 className="text-3xl font-bold text-text mb-2">Profile</h1>
-        <p className="text-text-secondary">Manage your account and preferences</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-text mb-1 sm:mb-2">Profile</h1>
+        <p className="text-sm sm:text-base text-text-secondary">Manage your account and preferences</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Profile Information */}
@@ -386,6 +212,111 @@ const UserProfile = () => {
             {syncStatus.pendingCount === 0 && syncStatus.isOnline && (
               <p className="text-sm text-text-secondary">All data is synced</p>
             )}
+          </Card>
+
+          {/* Notifications */}
+          <Card>
+            <h2 className="text-xl font-semibold text-text mb-4 flex items-center gap-2">
+              <Bell size={20} />
+              Notifications
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-text mb-1">Permission Status</p>
+                <p className="text-sm text-text-secondary">
+                  {permission === 'granted' ? (
+                    <span className="text-green-600">✓ Enabled</span>
+                  ) : permission === 'denied' ? (
+                    <span className="text-red-600">✗ Denied</span>
+                  ) : (
+                    <span className="text-yellow-600">⚠ Not set</span>
+                  )}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-text mb-1">Drain Monitoring</p>
+                <p className="text-sm text-text-secondary">
+                  {isMonitoring ? (
+                    <span className="text-green-600">✓ Active</span>
+                  ) : (
+                    <span className="text-gray-600">Inactive</span>
+                  )}
+                </p>
+              </div>
+
+              {permission !== 'granted' && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await requestPermission()
+                      if (permission === 'granted') {
+                        startMonitoring()
+                      }
+                    } catch (error) {
+                      console.error('Error requesting permission:', error)
+                    }
+                  }}
+                  className="w-full"
+                >
+                  <Bell size={16} className="mr-2" />
+                  Enable Notifications
+                </Button>
+              )}
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={async () => {
+                  setTestingNotification(true)
+                  setNotificationStatus(null)
+                  try {
+                    const status = checkNotificationStatus()
+                    setNotificationStatus(status)
+                    const success = await testNotification()
+                    if (success) {
+                      setNotificationStatus(prev => ({ ...prev, testSuccess: true }))
+                    } else {
+                      setNotificationStatus(prev => ({ ...prev, testSuccess: false }))
+                    }
+                  } catch (error) {
+                    setNotificationStatus({ error: error.message })
+                  } finally {
+                    setTestingNotification(false)
+                  }
+                }}
+                disabled={testingNotification || permission !== 'granted'}
+                className="w-full"
+              >
+                {testingNotification ? (
+                  <>
+                    <Loader className="animate-spin mr-2" size={16} />
+                    Testing...
+                  </>
+                ) : (
+                  <>
+                    <Bell size={16} className="mr-2" />
+                    Test Notification
+                  </>
+                )}
+              </Button>
+
+              {notificationStatus && (
+                <div className="p-3 rounded-xl bg-bg border border-border">
+                  <p className="text-xs font-medium text-text mb-2">Status:</p>
+                  <pre className="text-xs text-text-secondary overflow-x-auto">
+                    {JSON.stringify(notificationStatus, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              <div className="text-xs text-text-secondary">
+                <p>• Notifications alert you when drains reach warning or critical status</p>
+                <p>• Monitoring starts automatically when you enable notifications</p>
+              </div>
+            </div>
           </Card>
         </div>
 

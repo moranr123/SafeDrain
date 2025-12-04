@@ -46,7 +46,7 @@ const Modal = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4"
       onClick={onClose}
     >
       {/* Backdrop */}
@@ -59,32 +59,33 @@ const Modal = ({
       <div
         className={`
           relative bg-bg-surface rounded-xl shadow-chat-lg w-full ${sizes[size]}
-          transform transition-all duration-200
+          transform transition-all duration-200 max-h-[95vh] overflow-hidden flex flex-col
           ${className}
         `}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between p-6 border-b border-border">
-            <h2 className="text-xl font-semibold text-text">{title}</h2>
+          <div className="flex items-center justify-between p-4 sm:p-6 border-b border-border flex-shrink-0">
+            <h2 className="text-lg sm:text-xl font-semibold text-text pr-2 truncate">{title}</h2>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl hover:bg-bg text-text-secondary transition-colors"
+              className="p-1.5 sm:p-2 rounded-xl hover:bg-bg text-text-secondary transition-colors flex-shrink-0 touch-manipulation"
+              aria-label="Close modal"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
         )}
         
         {/* Body */}
-        <div className="p-6">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           {children}
         </div>
         
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-border">
+          <div className="flex items-center justify-end gap-2 sm:gap-3 p-4 sm:p-6 border-t border-border flex-shrink-0">
             {footer}
           </div>
         )}

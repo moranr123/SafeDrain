@@ -10,7 +10,8 @@ import {
   LogOut,
   Menu,
   X,
-  Droplet
+  Droplet,
+  Home
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import Button from '../ui/Button'
@@ -36,7 +37,7 @@ const AdminLayout = ({ children }) => {
   const handleLogout = async () => {
     try {
       await logout()
-      navigate('/admin/login')
+      navigate('/login')
     } catch (error) {
       console.error('Logout error:', error)
     }
@@ -110,7 +111,11 @@ const AdminLayout = ({ children }) => {
           `}
         >
           <nav className="p-4 space-y-2">
-            {navItems.map((item) => {
+            {navItems.map((item, index) => {
+              if (item.type === 'divider') {
+                return <div key={`divider-${index}`} className="h-px bg-border my-2" />
+              }
+              
               const Icon = item.icon
               return (
                 <Link

@@ -10,7 +10,8 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider
 } from 'firebase/auth'
-import { auth } from '../config/firebase'
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { auth, db } from '../config/firebase'
 
 const AuthContext = createContext({})
 
@@ -24,10 +25,49 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null)
+  const [userRole, setUserRole] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [roleLoading, setRoleLoading] = useState(false)
+
+  // Fetch user role from Firestore
+  const fetchUserRole = async (userId, userEmail = '', userDisplayName = '') => {
+    if (!userId) {
+      setUserRole(null)
+      return null
+    }
+
+    try {
+      setRoleLoading(true)
+      const userDoc = await getDoc(doc(db, 'users', userId))
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data()
+        const role = userData.role || 'user' // Default to 'user' if no role set
+        setUserRole(role)
+        return role
+      } else {
+        // Create user document with default role
+        await setDoc(doc(db, 'users', userId), {
+          email: userEmail || currentUser?.email || '',
+          displayName: userDisplayName || currentUser?.displayName || '',
+          role: 'user', // Default role
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        })
+        setUserRole('user')
+        return 'user'
+      }
+    } catch (error) {
+      console.error('Error fetching user role:', error)
+      setUserRole('user') // Default to user on error
+      return 'user'
+    } finally {
+      setRoleLoading(false)
+    }
+  }
 
   // Sign up with email and password
-  const signup = async (email, password, displayName = null) => {
+  const signup = async (email, password, displayName = null, role = 'user') => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       
@@ -35,6 +75,17 @@ export const AuthProvider = ({ children }) => {
       if (displayName) {
         await updateProfile(userCredential.user, { displayName })
       }
+
+      // Create user document in Firestore with role
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        email,
+        displayName: displayName || '',
+        role: role || 'user',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      })
+
+      setUserRole(role || 'user')
       
       return userCredential.user
     } catch (error) {
@@ -104,16 +155,35 @@ export const AuthProvider = ({ children }) => {
 
   // Listen for auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user)
+      
+      if (user) {
+        // Fetch user role when user logs in
+        await fetchUserRole(user.uid, user.email || '', user.displayName || '')
+      } else {
+        setUserRole(null)
+      }
+      
       setLoading(false)
     })
 
     return unsubscribe
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Check if user is admin
+  const isAdmin = userRole === 'admin'
+  
+  // Check if user has specific role
+  const hasRole = (role) => userRole === role
 
   const value = {
     currentUser,
+    userRole,
+    isAdmin,
+    hasRole,
+    fetchUserRole,
     signup,
     login,
     logout,
@@ -121,7 +191,7 @@ export const AuthProvider = ({ children }) => {
     changePassword,
     reauthenticate,
     updateUserProfile,
-    loading
+    loading: loading || roleLoading
   }
 
   return (

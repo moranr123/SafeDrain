@@ -55,7 +55,7 @@ const Layout = ({ children }) => {
 
         {/* Main Content */}
         <main className="flex-1 lg:ml-0 min-h-screen w-full">
-          <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+          <div className="p-3 sm:p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">
             {children}
           </div>
         </main>

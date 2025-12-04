@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Bell, Filter } from 'lucide-react'
+import { Bell, Filter, Droplet, ExternalLink } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import AlertCard from '../components/AlertCard'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import Select from '../components/ui/Select'
 import { getAlerts, markAlertAsRead } from '../services/drainService'
+import { subscribeToCollection } from '../services/firestoreHelpers'
 
 const Alerts = () => {
   const [alerts, setAlerts] = useState([])
@@ -11,18 +14,19 @@ const Alerts = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchAlerts = async () => {
-      try {
-        const alertsData = await getAlerts()
-        setAlerts(alertsData)
-      } catch (error) {
-        console.error('Error fetching alerts:', error)
-      } finally {
+    // Real-time listener for alerts
+    const unsubscribe = subscribeToCollection(
+      'alerts',
+      (documents) => {
+        setAlerts(documents)
         setLoading(false)
-      }
-    }
+      },
+      [],
+      'createdAt',
+      'desc'
+    )
 
-    fetchAlerts()
+    return () => unsubscribe()
   }, [])
 
   const handleDismiss = async (alertId) => {
@@ -52,29 +56,48 @@ const Alerts = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-bold text-text mb-2">Alerts</h1>
-          <p className="text-text-secondary">
+          <h1 className="text-2xl sm:text-3xl font-bold text-text mb-1 sm:mb-2">Alerts</h1>
+          <p className="text-sm sm:text-base text-text-secondary">
             {unreadCount > 0 ? `${unreadCount} unread alert${unreadCount > 1 ? 's' : ''}` : 'All alerts read'}
           </p>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Filter size={18} className="text-text-secondary" />
-        {['all', 'unread', 'critical', 'warning', 'info'].map((filterType) => (
-          <Button
-            key={filterType}
-            onClick={() => setFilter(filterType)}
-            variant={filter === filterType ? 'primary' : 'secondary'}
-            size="sm"
+      {/* Filters - Dropdown on mobile, buttons on desktop */}
+      <div className="space-y-2">
+        {/* Mobile Dropdown */}
+        <div className="md:hidden">
+          <Select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="w-full"
           >
-            {filterType.charAt(0).toUpperCase() + filterType.slice(1)}
-          </Button>
-        ))}
+            <option value="all">All Alerts</option>
+            <option value="unread">Unread</option>
+            <option value="critical">Critical</option>
+            <option value="warning">Warning</option>
+            <option value="info">Info</option>
+          </Select>
+        </div>
+
+        {/* Desktop Buttons */}
+        <div className="hidden md:flex items-center gap-2 flex-wrap">
+          <Filter size={16} className="text-text-secondary flex-shrink-0" />
+          {['all', 'unread', 'critical', 'warning', 'info'].map((filterType) => (
+            <Button
+              key={filterType}
+              onClick={() => setFilter(filterType)}
+              variant={filter === filterType ? 'primary' : 'secondary'}
+              size="sm"
+              className="text-sm px-3 py-1.5"
+            >
+              {filterType.charAt(0).toUpperCase() + filterType.slice(1)}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {/* Alerts List */}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Bell, AlertTriangle, Info, CheckCircle, X } from 'lucide-react'
-import { getAlerts, markAlertAsRead, addAlert } from '../../services/drainService'
+import { Bell, AlertTriangle, Info, CheckCircle, X, Droplet } from 'lucide-react'
+import { getAlerts, markAlertAsRead, addAlert, getDrains } from '../../services/drainService'
 import { subscribeToCollection } from '../../services/firestoreHelpers'
 import { format } from 'date-fns'
 import Card from '../../components/ui/Card'
@@ -12,7 +12,9 @@ import Select from '../../components/ui/Select'
 
 const NotificationCenter = () => {
   const [alerts, setAlerts] = useState([])
+  const [drains, setDrains] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingDrains, setLoadingDrains] = useState(true)
   const [filter, setFilter] = useState('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newAlert, setNewAlert] = useState({
@@ -23,7 +25,7 @@ const NotificationCenter = () => {
   })
 
   useEffect(() => {
-    // Real-time listener
+    // Real-time listener for alerts
     const unsubscribe = subscribeToCollection(
       'alerts',
       (documents) => {
@@ -38,6 +40,22 @@ const NotificationCenter = () => {
     return () => unsubscribe()
   }, [])
 
+  useEffect(() => {
+    // Fetch all drains for the dropdown
+    const fetchDrains = async () => {
+      try {
+        const drainsData = await getDrains()
+        setDrains(drainsData)
+      } catch (error) {
+        console.error('Error fetching drains:', error)
+      } finally {
+        setLoadingDrains(false)
+      }
+    }
+
+    fetchDrains()
+  }, [])
+
   const handleMarkAsRead = async (alertId) => {
     try {
       await markAlertAsRead(alertId)
@@ -49,7 +67,18 @@ const NotificationCenter = () => {
   const handleCreateAlert = async (e) => {
     e.preventDefault()
     try {
-      await addAlert(newAlert)
+      // Prepare alert data - only include drainId if one is selected
+      const alertData = {
+        title: newAlert.title,
+        message: newAlert.message,
+        severity: newAlert.severity,
+        ...(newAlert.drainId && {
+          drainId: newAlert.drainId,
+          drainName: drains.find(d => d.id === newAlert.drainId)?.name || 'Unknown Drain'
+        })
+      }
+      
+      await addAlert(alertData)
       setShowCreateModal(false)
       setNewAlert({
         title: '',
@@ -163,7 +192,10 @@ const NotificationCenter = () => {
                         </span>
                       )}
                       {alert.drainId && (
-                        <span>Drain: {alert.drainId}</span>
+                        <span className="flex items-center gap-1">
+                          <Droplet size={12} />
+                          Drain: {alert.drainName || alert.drainId}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -214,12 +246,24 @@ const NotificationCenter = () => {
             <option value="warning">Warning</option>
             <option value="critical">Critical</option>
           </Select>
-          <Input
-            label="Drain ID (Optional)"
+          <Select
+            label="Drain (Optional)"
             value={newAlert.drainId}
             onChange={(e) => setNewAlert({ ...newAlert, drainId: e.target.value })}
-            placeholder="Leave empty for general alert"
-          />
+          >
+            <option value="">General Alert (No specific drain)</option>
+            {loadingDrains ? (
+              <option disabled>Loading drains...</option>
+            ) : drains.length === 0 ? (
+              <option disabled>No drains available</option>
+            ) : (
+              drains.map((drain) => (
+                <option key={drain.id} value={drain.id}>
+                  {drain.name || `Drain ${drain.id.slice(0, 8)}`} {drain.status ? `(${drain.status})` : ''}
+                </option>
+              ))
+            )}
+          </Select>
           <div className="flex gap-3">
             <Button type="submit" className="flex-1">
               Create Alert

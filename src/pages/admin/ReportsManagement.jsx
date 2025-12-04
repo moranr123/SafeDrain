@@ -20,29 +20,48 @@ const ReportsManagement = () => {
   const [showModal, setShowModal] = useState(false)
   const [updating, setUpdating] = useState(false)
 
+  // Update URL when filter changes (separate effect to avoid recreating listener)
   useEffect(() => {
-    // Update URL when filter changes
     if (filterStatus !== 'all') {
-      setSearchParams({ status: filterStatus })
+      setSearchParams({ status: filterStatus }, { replace: true })
     } else {
-      setSearchParams({})
+      setSearchParams({}, { replace: true })
+    }
+  }, [filterStatus, setSearchParams])
+
+  // Real-time listener (only set up once, not dependent on filterStatus)
+  useEffect(() => {
+    let unsubscribe = null
+    let isMounted = true
+
+    try {
+      unsubscribe = subscribeToCollection(
+        'reports',
+        (documents) => {
+          if (isMounted) {
+            setReports(documents)
+            setLoading(false)
+          }
+        },
+        [],
+        'createdAt',
+        'desc',
+        1000
+      )
+    } catch (error) {
+      console.error('Error setting up reports listener:', error)
+      if (isMounted) {
+        setLoading(false)
+      }
     }
 
-    // Real-time listener
-    const unsubscribe = subscribeToCollection(
-      'reports',
-      (documents) => {
-        setReports(documents)
-        setLoading(false)
-      },
-      [],
-      'createdAt',
-      'desc',
-      1000
-    )
-
-    return () => unsubscribe()
-  }, [filterStatus, setSearchParams])
+    return () => {
+      isMounted = false
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
+  }, []) // Empty dependency array - only set up once
 
   const handleStatusChange = async (reportId, newStatus) => {
     setUpdating(true)
@@ -203,7 +222,12 @@ const ReportsManagement = () => {
                   <div className="flex items-center gap-4 text-xs text-text-muted flex-wrap">
                     {report.createdAt && (
                       <span>
-                        {format(new Date(report.createdAt), 'MMM d, yyyy h:mm a')}
+                        {format(
+                          report.createdAt instanceof Date 
+                            ? report.createdAt 
+                            : new Date(report.createdAt), 
+                          'MMM d, yyyy h:mm a'
+                        )}
                       </span>
                     )}
                     {report.location && (

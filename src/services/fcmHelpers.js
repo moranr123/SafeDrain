@@ -81,29 +81,52 @@ export const onForegroundMessage = (callback) => {
 
 // Show browser notification
 export const showNotification = (title, body, icon = null) => {
+  console.log('showNotification called:', { title, body, icon })
+  
   if (!('Notification' in window)) {
     console.warn('This browser does not support notifications')
     return
   }
   
-  if (Notification.permission === 'granted') {
-    const notification = new Notification(title, {
-      body,
-      icon: icon || '/src/assets/logo.png',
-      badge: '/src/assets/logo.png',
-      tag: 'safedrain-notification',
-      requireInteraction: false
-    })
-    
-    notification.onclick = () => {
-      window.focus()
-      notification.close()
+  const permission = Notification.permission
+  console.log('Notification permission:', permission)
+  
+  if (permission === 'granted') {
+    try {
+      // Use a default icon path that works
+      const defaultIcon = icon || window.location.origin + '/src/assets/logo.png'
+      
+      console.log('Creating notification with icon:', defaultIcon)
+      
+      const notification = new Notification(title, {
+        body,
+        icon: defaultIcon,
+        badge: defaultIcon,
+        tag: 'safedrain-notification',
+        requireInteraction: false
+      })
+      
+      console.log('Notification created successfully')
+      
+      notification.onclick = () => {
+        console.log('Notification clicked')
+        window.focus()
+        notification.close()
+      }
+      
+      notification.onerror = (error) => {
+        console.error('Notification error:', error)
+      }
+      
+      // Auto-close after 5 seconds
+      setTimeout(() => {
+        notification.close()
+      }, 5000)
+    } catch (error) {
+      console.error('Error creating notification:', error)
     }
-    
-    // Auto-close after 5 seconds
-    setTimeout(() => {
-      notification.close()
-    }, 5000)
+  } else {
+    console.warn('Cannot show notification: permission is', permission)
   }
 }
 

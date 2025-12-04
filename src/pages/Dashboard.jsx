@@ -50,14 +50,14 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-text mb-2">Dashboard</h1>
-        <p className="text-text-secondary">Overview of your drain monitoring system</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-text mb-1 sm:mb-2">Dashboard</h1>
+        <p className="text-sm sm:text-base text-text-secondary">Overview of your drain monitoring system</p>
       </div>
 
       {/* Stats Grid - 2 columns on mobile, 4 on desktop */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
         <StatCard
           title="Total Drains"
           value={drains.length}
@@ -88,11 +88,11 @@ const Dashboard = () => {
 
       {/* Recent Alerts */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-text">Recent Alerts</h2>
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <h2 className="text-lg sm:text-xl font-semibold text-text">Recent Alerts</h2>
           <Link
             to="/alerts"
-            className="text-primary hover:text-primary-hover text-sm font-medium"
+            className="text-primary hover:text-primary-hover text-xs sm:text-sm font-medium"
           >
             View all →
           </Link>
@@ -112,27 +112,27 @@ const Dashboard = () => {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-xl font-semibold text-text mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <h2 className="text-lg sm:text-xl font-semibold text-text mb-3 sm:mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <Link to="/monitoring">
-            <Card hover className="flex items-center gap-4">
-              <div className="p-3 bg-primary/10 rounded-xl">
-                <Activity className="text-primary" size={24} />
+            <Card hover className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4">
+              <div className="p-2 sm:p-3 bg-primary/10 rounded-xl flex-shrink-0">
+                <Activity className="text-primary" size={20} />
               </div>
-              <div>
-                <h3 className="font-semibold text-text">View Monitoring</h3>
-                <p className="text-sm text-text-secondary">Check real-time drain status</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-sm sm:text-base text-text">View Monitoring</h3>
+                <p className="text-xs sm:text-sm text-text-secondary">Check real-time drain status</p>
               </div>
             </Card>
           </Link>
           <Link to="/submit-report">
-            <Card hover className="flex items-center gap-4">
-              <div className="p-3 bg-primary/10 rounded-xl">
-                <Plus className="text-primary" size={24} />
+            <Card hover className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4">
+              <div className="p-2 sm:p-3 bg-primary/10 rounded-xl flex-shrink-0">
+                <Plus className="text-primary" size={20} />
               </div>
-              <div>
-                <h3 className="font-semibold text-text">Submit Report</h3>
-                <p className="text-sm text-text-secondary">Report a drain issue</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-sm sm:text-base text-text">Submit Report</h3>
+                <p className="text-xs sm:text-sm text-text-secondary">Report a drain issue</p>
               </div>
             </Card>
           </Link>
