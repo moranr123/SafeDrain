@@ -1,0 +1,72 @@
+/* Google Maps styles are loaded via script tag in index.html */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-bg text-text antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  }
+}
+
+@layer components {
+  /* Smooth transitions for all interactive elements */
+  * {
+    @apply transition-colors duration-200;
+  }
+  
+  /* Google Maps container */
+  .gm-style {
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+  
+  /* Mobile touch improvements */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Prevent body scroll when sidebar is open on mobile */
+  body.sidebar-open {
+    overflow: hidden;
+  }
+  
+  /* Smooth scrolling for sidebar */
+  aside {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  }
+  
+  aside::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  aside::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  aside::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+  }
+  
+  /* Hide scrollbar for horizontal scroll on mobile */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
